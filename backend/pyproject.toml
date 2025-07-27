@@ -1,0 +1,19 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "algoliasearch>=4,<5",
+    "beautifulsoup4>=4.13.4",
+    "fastapi>=0.116.1",
+    "lxml>=6.0.0",
+    "motor>=3.7.1",
+    "pydantic-settings>=2.10.1",
+    "pymongo>=4.13.2",
+    "python-dotenv>=1.1.1",
+    "redis>=6.2.0",
+    "requests>=2.32.4",
+    "uvicorn>=0.35.0",
+]
