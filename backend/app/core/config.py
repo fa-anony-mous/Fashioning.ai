@@ -24,7 +24,10 @@ class Settings(BaseSettings):
         # Add your Vercel domain here when deployed
         "https://fashioning-ai.vercel.app",
         "https://fashioning-ai-git-main-fa-anony-mous.vercel.app",
-        "https://fashioning-ai-fa-anony-mous.vercel.app"
+        "https://fashioning-ai-fa-anony-mous.vercel.app",
+        # Cloud Storage domains
+        "https://fashioning-ai-frontend.storage.googleapis.com",
+        "https://storage.googleapis.com"
     ]
     
     

@@ -3,10 +3,15 @@ Fashioning.ai - FastAPI Backend
 Main application entry point for the fashion trend discovery platform.
 """
 
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.v1 import trends, users, news
 from app.services.algolia_service import algolia_service
 
 # Create FastAPI application
@@ -29,19 +34,15 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await algolia_service.close()
+    if algolia_service:
+        await algolia_service.close()
 
 # Include API routers
+from app.api.v1 import trends, users, news, ai, data_enrichment
 app.include_router(trends.router, prefix="/api/v1/trends", tags=["trends"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(news.router, prefix="/api/v1/news", tags=["news"])
-
-# Import and include AI router
-from app.api.v1 import ai
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
-
-# Import and include data enrichment router
-from app.api.v1 import data_enrichment
 app.include_router(data_enrichment.router, prefix="/api/v1/enrichment", tags=["data-enrichment"])
 
 @app.get("/")
@@ -61,14 +62,9 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    import os
-    
-    # Get port from environment variable (Railway) or default to 8000
-    port = int(os.environ.get("PORT", 8000))
-    
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=port,
-        reload=False  # Disable reload in production
+        port=8000,
+        reload=True
     )

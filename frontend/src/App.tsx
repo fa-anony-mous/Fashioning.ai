@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Sparkles, Heart, TrendingUp, Globe, MessageCircle, Database } from 'lucide-react';
-import { FashionTrend } from './types/fashion';
+import type { FashionTrend } from './types/fashion';
 import SearchFilters from './components/SearchFilters';
 import TrendsGrid from './components/TrendsGrid';
 import QuickStats from './components/QuickStats';

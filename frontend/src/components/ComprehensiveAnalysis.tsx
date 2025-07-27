@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { TrendingUp, Leaf, DollarSign, Palette, Clock, Star, Loader2 } from 'lucide-react';
 import { fashionApi } from '../services/api';
-import { FashionTrend } from '../types/fashion';
+import type { FashionTrend } from '../types/fashion';
 
 interface ComprehensiveAnalysisProps {
   trend: FashionTrend;

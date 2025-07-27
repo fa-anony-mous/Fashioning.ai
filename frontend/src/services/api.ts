@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { TrendsResponse, SearchParams, TrendAnalysis, UserPreferences } from '../types/fashion';
 
-// Use environment variable for API URL, fallback to localhost for development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+// Use environment variable for API URL, fallback to deployed backend for production
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://fashioning-ai-backend-818105867641.us-central1.run.app/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

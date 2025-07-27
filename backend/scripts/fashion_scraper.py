@@ -147,17 +147,17 @@ class FashionTrendScraper:
         article_tags = soup.find_all(['article', 'div'], class_=re.compile(r'(article|story|show|collection|post)'))
         
         for article in article_tags[:15]:  # Limit to 15 articles per site
-            try:
-                # Extract title
+                try:
+                    # Extract title
                 title_elem = article.find(['h1', 'h2', 'h3', 'h4'])
                 if not title_elem:
                     continue
-                title = title_elem.get_text(strip=True)
-                
-                # Extract description
+                        title = title_elem.get_text(strip=True)
+                        
+                        # Extract description
                 desc_elem = article.find(['p', 'div'], class_=re.compile(r'(description|summary|excerpt)'))
-                description = desc_elem.get_text(strip=True) if desc_elem else ""
-                
+                        description = desc_elem.get_text(strip=True) if desc_elem else ""
+                        
                 # Extract tags/keywords
                 tag_elems = article.find_all(['span', 'a'], class_=re.compile(r'(tag|keyword|category)'))
                 tags = [tag.get_text(strip=True) for tag in tag_elems if tag.get_text(strip=True)]
@@ -183,7 +183,7 @@ class FashionTrendScraper:
                 images = self.extract_images(article)
                 
                 # Generate trend data
-                trend = {
+                            trend = {
                     "objectID": f"fashion_{len(results) + 1}_{int(time.time())}",
                     "name": title,
                     "category": category,
@@ -220,9 +220,9 @@ class FashionTrendScraper:
                 results.append(trend)
                 print(f"   ✅ Extracted: {title[:50]}... ({category})")
                             
-            except Exception as e:
+                except Exception as e:
                 print(f"   ⚠️ Error processing article: {str(e)}")
-                continue
+                    continue
         
         return results
 

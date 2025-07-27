@@ -49,7 +49,7 @@ class TrendResponse(BaseModel):
     page: int
     pages: int
     facets: Dict[str, Any]
-    processing_time: int
+    processing_time: float
     error: Optional[str] = None
 
 class TrendAnalysis(BaseModel):

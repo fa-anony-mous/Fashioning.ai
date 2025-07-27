@@ -4,7 +4,7 @@ Core service for integrating with Algolia to fetch and analyze fashion trends
 """
 
 import os
-from algoliasearch.search.client import SearchClient
+from algoliasearch.search_client import SearchClient
 from app.core.config import settings
 from typing import Dict, List, Optional, Any
 from app.models.trend import Trend, TrendResponse
@@ -14,6 +14,8 @@ from app.services.mock_data import (
     get_mock_regions,
     get_mock_trend_by_id
 )
+from fastapi.concurrency import run_in_threadpool
+
 
 class AlgoliaService:
     """Service for interacting with Algolia search API"""
@@ -22,93 +24,81 @@ class AlgoliaService:
         """Initialize Algolia client"""
         if not settings.ALGOLIA_APP_ID or not settings.ALGOLIA_ADMIN_API_KEY:
             self.client = None
-            self.async_client = None
             return
             
-        self.async_client = SearchClient(
+        self.client = SearchClient.create(
             settings.ALGOLIA_APP_ID,
             settings.ALGOLIA_ADMIN_API_KEY
         )
         # Support multiple indices
-        self.trends_index = os.getenv("ALGOLIA_TRENDS_INDEX", "fashion_trends")
-        self.news_index = os.getenv("ALGOLIA_NEWS_INDEX", "fashion_news")
-        self.index_name = self.trends_index  # Default for backward compatibility
-    
+        self.trends_index_name = os.getenv("ALGOLIA_TRENDS_INDEX", "fashion_trends")
+        self.news_index_name = os.getenv("ALGOLIA_NEWS_INDEX", "fashion_news")
+
     async def search_trends(
-        self,
-        query: str,
-        category: Optional[str] = None,
-        region: Optional[str] = None,
-        page: int = 0,
-        per_page: int = 20
+        self, query: str = "", limit: int = 20, offset: int = 0, 
+        category: Optional[str] = None, region: Optional[str] = None
     ) -> TrendResponse:
         """
         Search for fashion trends using Algolia, with optional filters.
         """
-        if not self.async_client:
-            # Use mock data when Algolia is not configured
-            return get_mock_trends_response(query, category, region, page, per_page)
-        
+        if not self.client:
+            return get_mock_trends_response()
+            
         filters = []
         if category:
             filters.append(f"category:'{category}'")
         if region:
             filters.append(f"regions:'{region}'")
-        
-        filter_string = " AND ".join(filters) if filters else ""
-        
+        filter_string = " AND ".join(filters)
+
         try:
-            response = await self.async_client.search_single_index(
-                index_name=self.index_name,
-                search_params={
-                    "query": query,
-                    "page": page,
-                    "hitsPerPage": per_page,
-                    "attributesToHighlight": [],
+            trends_index = self.client.init_index(self.trends_index_name)
+            
+            response = await run_in_threadpool(
+                trends_index.search,
+                query,
+                {
+                    "hitsPerPage": limit,
+                    "page": offset // limit if limit > 0 else 0,
                     "filters": filter_string,
                     "facets": ["category", "regions"]
                 }
             )
+
+            hits = [Trend(**dict(hit)) for hit in response.get("hits", [])]
             
-            hits = [Trend(**dict(hit)) for hit in response.hits]
-            
-            return TrendResponse(
+            trend_response = TrendResponse(
                 hits=hits,
-                total=response.nb_hits,
-                page=response.page,
-                pages=response.nb_pages,
-                facets=response.facets or {},
-                processing_time=response.processing_time_ms
+                total=response.get("nbHits", 0),
+                limit=limit,
+                offset=offset,
+                pages=response.get("nbPages", 0),
+                facets=response.get("facets", {}),
+                processing_time=response.get("processingTimeMS", 0)
             )
+            return trend_response
         except Exception as e:
-            # In case of an error, use mock data
-            print(f"Algolia error: {e}, using mock data")
-            return get_mock_trends_response(query, category, region, page, per_page)
+            return get_mock_trends_response()
     
     async def get_trend_by_id(self, trend_id: str) -> Optional[Trend]:
         """
         Retrieve a single trend by its objectID.
         """
-        if not self.async_client:
-            # Use mock data when Algolia is not configured
+        if not self.client:
             return get_mock_trend_by_id(trend_id)
-            
+        
         try:
-            response = await self.async_client.get_object(
-                index_name=self.index_name,
-                object_id=trend_id
-            )
+            trends_index = self.client.init_index(self.trends_index_name)
+            response = await run_in_threadpool(trends_index.get_object, trend_id)
             return Trend(**response)
-        except Exception:
-            # Use mock data on error
+        except Exception as e:
             return get_mock_trend_by_id(trend_id)
 
     async def get_facet_values(self, facet_name: str) -> List[str]:
         """
         Get all unique values for a given facet from the Algolia index.
         """
-        if not self.async_client:
-            # Use mock data when Algolia is not configured
+        if not self.client:
             if facet_name == 'category':
                 return get_mock_categories()
             elif facet_name == 'regions':
@@ -116,14 +106,10 @@ class AlgoliaService:
             return []
         
         try:
-            response = await self.async_client.search_for_facet_values(
-                index_name=self.trends_index,
-                facet_name=facet_name,
-                facet_query=""
-            )
-            return [facet.value for facet in response.facet_hits]
+            trends_index = self.client.init_index(self.trends_index_name)
+            response = await run_in_threadpool(trends_index.search_for_facet_values, facet_name, "")
+            return [facet['value'] for facet in response.get("facetHits", [])]
         except Exception:
-            # Use mock data on error
             if facet_name == 'category':
                 return get_mock_categories()
             elif facet_name == 'regions':
@@ -134,91 +120,84 @@ class AlgoliaService:
         """
         Search fashion news from the fashion_news index.
         """
-        if not self.async_client:
-            return {
-                "hits": [],
-                "total": 0,
-                "page": page,
-                "pages": 0,
-                "processing_time": 0
-            }
+        if not self.client:
+            return {"hits": [], "total": 0, "page": page, "pages": 0, "processing_time": 0}
         
         try:
-            response = await self.async_client.search_single_index(
-                index_name=self.news_index,
-                search_params={
-                    "query": query,
-                    "page": page,
-                    "hitsPerPage": per_page,
-                    "attributesToHighlight": []
-                }
+            news_index = self.client.init_index(self.news_index_name)
+            response = await run_in_threadpool(
+                news_index.search,
+                query,
+                {"page": page, "hitsPerPage": per_page, "attributesToHighlight": []}
             )
             
             return {
-                "hits": response.hits,
-                "total": response.nb_hits,
-                "page": response.page,
-                "pages": response.nb_pages,
-                "processing_time": response.processing_time_ms
+                "hits": response.get("hits", []),
+                "total": response.get("nbHits", 0),
+                "page": response.get("page", 0),
+                "pages": response.get("nbPages", 0),
+                "processing_time": response.get("processingTimeMS", 0)
             }
         except Exception as e:
             print(f"Algolia news search error: {e}")
-            return {
-                "hits": [],
-                "total": 0,
-                "page": page,
-                "pages": 0,
-                "processing_time": 0
-            }
+            return {"hits": [], "total": 0, "page": page, "pages": 0, "processing_time": 0}
+
+    async def get_all_categories(self) -> List[str]:
+        if not self.client:
+            return get_mock_categories()
+
+        try:
+            trends_index = self.client.init_index(self.trends_index_name)
+            response = await run_in_threadpool(trends_index.search, "", {"facets": ["category"]})
+            return list(response.get("facets", {}).get("category", {}).keys())
+        except Exception as e:
+            return get_mock_categories()
+
+    async def get_all_regions(self) -> List[str]:
+        if not self.client:
+            return get_mock_regions()
+            
+        try:
+            trends_index = self.client.init_index(self.trends_index_name)
+            response = await run_in_threadpool(trends_index.search, "", {"facets": ["regions"]})
+            return list(response.get("facets", {}).get("regions", {}).keys())
+        except Exception as e:
+            return get_mock_regions()
 
     async def get_combined_stats(self) -> Dict[str, Any]:
         """
         Get combined statistics from both indices.
         """
-        if not self.async_client:
+        if not self.client:
             return {
-                "trends_total": 5,
-                "news_total": 0,
-                "categories": len(get_mock_categories()),
-                "regions": len(get_mock_regions())
+                "trends_total": 3,
+                "categories": 3,
+                "regions": 3,
             }
-        
         try:
-            # Get trends count
-            trends_response = await self.async_client.search_single_index(
-                index_name=self.trends_index,
-                search_params={"query": "", "hitsPerPage": 1}
-            )
-            
-            # Get news count
-            news_response = await self.async_client.search_single_index(
-                index_name=self.news_index,
-                search_params={"query": "", "hitsPerPage": 1}
-            )
-            
-            # Get categories and regions
-            categories = await self.get_facet_values('category')
-            regions = await self.get_facet_values('regions')
+            trends_index = self.client.init_index(self.trends_index_name)
+            # Use search to get total counts from facets
+            response = await run_in_threadpool(trends_index.search, '', {
+                'hitsPerPage': 0,
+                'facets': ['category', 'regions']
+            })
             
             return {
-                "trends_total": trends_response.nb_hits,
-                "news_total": news_response.nb_hits,
-                "categories": len(categories),
-                "regions": len(regions)
+                "trends_total": response.get('nbHits', 0),
+                "categories": len(response.get('facets', {}).get('category', {})),
+                "regions": len(response.get('facets', {}).get('regions', {})),
             }
         except Exception as e:
-            print(f"Error getting combined stats: {e}")
             return {
-                "trends_total": 5,
-                "news_total": 0,
-                "categories": len(get_mock_categories()),
-                "regions": len(get_mock_regions())
+                "trends_total": 3,
+                "categories": 3,
+                "regions": 3,
             }
-
+            
     async def close(self):
         """Close the Algolia async client."""
-        if self.async_client:
-            await self.async_client.close()
+        if self.client:
+            await run_in_threadpool(self.client.close)
 
-# Create global instance
+# Singleton instance of the service
 algolia_service = AlgoliaService()
