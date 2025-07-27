@@ -16,7 +16,16 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-secret-key-change-in-production"
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000", 
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173",
+        # Add your Vercel domain here when deployed
+        "https://fashioning-ai.vercel.app",
+        "https://fashioning-ai-git-main-fa-anony-mous.vercel.app",
+        "https://fashioning-ai-fa-anony-mous.vercel.app"
+    ]
     
     
     # Algolia

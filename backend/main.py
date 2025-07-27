@@ -21,7 +21,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -61,9 +61,14 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+    import os
+    
+    # Get port from environment variable (Railway) or default to 8000
+    port = int(os.environ.get("PORT", 8000))
+    
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
-        reload=True
+        port=port,
+        reload=False  # Disable reload in production
     )
